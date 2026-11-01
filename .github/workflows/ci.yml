@@ -78,59 +78,9 @@ jobs:
           # Use defconfig as the base
           make defconfig
 
-          # Disable debug symbols (major build accelerator and space saver)
-          ./scripts/config --disable DEBUG_INFO
-          ./scripts/config --disable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT
-          ./scripts/config --disable DEBUG_INFO_DWARF4
-          ./scripts/config --disable DEBUG_INFO_DWARF5
-          ./scripts/config --disable DEBUG_INFO_BTF
-
-          # Enable essential modern subsystems for modern desktop distros
-          ./scripts/config --enable NAMESPACES
-          ./scripts/config --enable CGROUPS
-          ./scripts/config --enable BLK_DEV_NVME
-          ./scripts/config --enable EXT4_FS
-          ./scripts/config --enable BTRFS_FS
-          ./scripts/config --enable VFAT_FS
-          ./scripts/config --enable DRM_I915
-
-          # Resolve and sync dependencies
-          make olddefconfig
-
-      - name: Compile kernel and modules
-        working-directory: linux-src
-        run: |
-          ccache -z
-          ccache -s
-
-          NPROC=$(nproc)
-          echo "Compiling using $NPROC vCPUs..."
-
-          # Compile using ccache wrappers
-          make -j"$NPROC" CC="ccache gcc" bzImage modules
-
-          echo "==> Post-build ccache stats:"
-          ccache -s
-
-      - name: Package artifacts
-        working-directory: linux-src
-        run: |
-          mkdir -p ${{ github.workspace }}/distro-output/boot
-          
-          # Copy bzImage
-          cp arch/x86/boot/bzImage ${{ github.workspace }}/distro-output/boot/vmlinuz-custom
-          cp .config ${{ github.workspace }}/distro-output/boot/config-custom
-
-          # Install modules stripped to reduce size
-          make INSTALL_MOD_PATH=${{ github.workspace }}/distro-output INSTALL_MOD_STRIP=1 modules_install
-
-          # Create a compressed tarball for deployment
-          cd ${{ github.workspace }}/distro-output
-          tar -I 'zstd -T0 -19' -cf ${{ github.workspace }}/kernel-release.tar.zst boot lib
-
-      - name: Upload kernel artifacts
+      - name: Upload kernel defconfig
         uses: actions/upload-artifact@v4
         with:
-          name: custom-linux-kernel
-          path: ${{ github.workspace }}/kernel-release.tar.zst
+          name: config
+          path: ${{ github.workspace }}/linux-src/.config
           retention-days: 7
